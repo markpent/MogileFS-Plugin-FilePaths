@@ -768,11 +768,25 @@ sub _find_node_ex {
     return ($nodeid, 0) if $nodeid;
 
     if ($vivify) {
-        $dbh->do('INSERT INTO plugin_filepaths_paths (nodeid, dmid, parentnodeid, nodename, type, fid, lastmodified, link) ' .
+        eval {
+          $dbh->do('INSERT INTO plugin_filepaths_paths (nodeid, dmid, parentnodeid, nodename, type, fid, lastmodified, link) ' .
                  'VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)', undef, $dmid, $parentnodeid, $node, $nodetype, $fid, $lastmodified, $link);
-        return (undef, 0) if $dbh->err;
-
-        $nodeid = $dbh->{mysql_insertid}+0;
+        };
+        if($@) {
+          my $estr = $@;
+          if($estr =~ /Duplicate/) {
+            error("Recoverable Duplicate occured in _find_node_ex when inserting entry $node: $estr");
+            my $nodeid = $dbh->selectrow_array('SELECT nodeid FROM plugin_filepaths_paths ' .
+                                       'WHERE dmid = ? AND parentnodeid = ? AND nodename = ?',
+                                       undef, $dmid, $parentnodeid, $node);
+            return ($nodeid, 0) if $nodeid;
+          } else {
+            error("Unrecoverable Error occured in _find_node_ex when inserting entry $node: $estr");
+            return (undef, 0);
+          }
+        } else {
+          $nodeid = $dbh->{mysql_insertid}+0;
+        }
     }
 
     return (undef, 0) unless $nodeid && $nodeid > 0;
