@@ -101,9 +101,13 @@ sub load {
         # see if this file exists already
         my $oldfid = MogileFS::Plugin::FilePaths::get_file_mapping( $args->{dmid}, $parentnodeid, $filename );
         if (defined $oldfid && $oldfid) {
-            my $dbh = Mgd::get_dbh();
-            $dbh->do("DELETE FROM file WHERE fid=?", undef, $oldfid);
-            $dbh->do("REPLACE INTO file_to_delete SET fid=?", undef, $oldfid);
+          
+            my $sto = Mgd::get_store();
+            $sto->delete_fidid($oldfid);
+    
+            #my $dbh = Mgd::get_dbh();
+            #$dbh->do("DELETE FROM file WHERE fid=?", undef, $oldfid);
+            #$dbh->do("REPLACE INTO file_to_delete SET fid=?", undef, $oldfid);
         }
 
         my $fid = $args->{fid};
