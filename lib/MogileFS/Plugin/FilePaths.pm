@@ -36,9 +36,26 @@ use MogileFS::Util qw(error debug);
 sub _parse_path {
     my $fullpath = shift;
     return unless defined($fullpath) and length($fullpath);
-    my ($path, $file) = $fullpath =~
-        m!^(/(?:[\~\w\s\-\.\|\#\+]+/)*)([\~\w\s\-\.\|\#\+]+)$!;
+    
+    #im pretty liberal with paths... as long as it starts with a / ... 
+    #its up to the client to make sure its a valid path as far as OS concerns go becuase we use a DB to store the paths so anything goes...
+    
+    return unless index($fullpath, '/') == 0;
+    
+    my $pathpos = rindex($fullpath, '/');
+    return unless $pathpos >= 0;
+    
+    my $path = substr($fullpath, 0, $pathpos + 1);
+    my $file = substr($fullpath, $pathpos + 1);
+    
+    #error("split $fullpath into $path and $file");
     return ($path, $file);
+    
+    #my ($path2, $file2) = $fullpath =~
+    #    m!^(/(?:[\~\w\s\-\.\|\#\+]+/)*)([\~\w\s\-\.\|\#\+]+)$!;
+        
+    #error("regex split $fullpath into $path2 and $file2");
+    #return ($path2, $file2);
 }
 
 #this uses the 'error' channel to report a cache invalidation to any clients !watch ing the server.
@@ -64,8 +81,12 @@ sub load {
 
         my $fullpath = delete $args->{key};
         my ($path, $filename) = _parse_path($fullpath);
-        die "Filename is not a valid absolute path."
-            unless defined($path) && length($path) && defined($filename) && length($filename);
+        unless (defined($path) && length($path) && defined($filename) && length($filename)) {
+          error("$fullpath is not a valid absolute path");
+          die "Filename is not a valid absolute path." 
+        }
+        
+        
         return 1;
     });
 
@@ -883,8 +904,11 @@ sub _path_to_key {
     return 1 unless _check_dmid($dmid);
 
     # ensure we got a valid seeming path and filename
-    my ($path, $filename) =
-        ($args->{key} =~ m!^(/(?:[\~\w\s\-\.\|\#\+]+/)*)([\~\w\s\-\.\|\#\+]+)$!) ? ($1, $2) : (undef, undef);
+    
+    my ($path, $filename) = _parse_path($args->{key});
+    
+    #my ($path, $filename) =
+    #    ($args->{key} =~ m!^(/(?:[\~\w\s\-\.\|\#\+]+/)*)([\~\w\s\-\.\|\#\+]+)$!) ? ($1, $2) : (undef, undef);
     return 0 unless $path && defined $filename;
 
     # now try to get the end of the path
